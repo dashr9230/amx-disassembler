@@ -11,6 +11,7 @@
 #define AMX_COMPACTMARGIN 64
 #define AMX_USERNUM 4
 #define AMXAPI __cdecl
+#define sEXPMAX 19
 
 #define PACKED
 #define _FAR
@@ -69,59 +70,76 @@ typedef struct tagAMX {
 #endif
 } PACKED AMX;
 
+typedef struct tagAMX_FUNCSTUB {
+	ucell address         PACKED;
+	char name[sEXPMAX + 1]  PACKED;
+} PACKED AMX_FUNCSTUB;
+
+typedef struct tagFUNCSTUBNT {
+	ucell address         PACKED;
+	uint32_t nameofs      PACKED;
+} PACKED AMX_FUNCSTUBNT;
+
+#define USENAMETABLE(hdr) \
+                        ((hdr)->defsize==sizeof(AMX_FUNCSTUBNT))
 #define NUMENTRIES(hdr,field,nextfield) \
 	(unsigned)(((hdr)->nextfield - (hdr)->field) / (hdr)->defsize)
-
+#define GETENTRY(hdr,table,index) \
+                        (AMX_FUNCSTUB *)((unsigned char*)(hdr) + (unsigned)(hdr)->table + (unsigned)index*(hdr)->defsize)
+#define GETENTRYNAME(hdr,entry) \
+                        ( USENAMETABLE(hdr) \
+                           ? (char *)((unsigned char*)(hdr) + (unsigned)((AMX_FUNCSTUBNT*)(entry))->nameofs) \
+                           : ((AMX_FUNCSTUB*)(entry))->name )
 struct {
 	const char* name;
 	int flag;
 } OPCODES[] = { // TODO: find out which instruction has additional parameter(s)
 	{"none",0},
-	{"load.pri",0},
-	{"load.alt",0},
-	{"load.s.pri",0},
-	{"load.s.alt",0},
-	{"lref.pri",0},
-	{"lref.alt",0},
-	{"lref.s.pri",0},
-	{"lref.s.alt",0},
+	{"load.pri",1},
+	{"load.alt",1},
+	{"load.s.pri",1},
+	{"load.s.alt",1},
+	{"lref.pri",1},
+	{"lref.alt",1},
+	{"lref.s.pri",1},
+	{"lref.s.alt",1},
 	{"load.i",0},
-	{"lodb.i",0},
+	{"lodb.i",1},
 	{"const.pri",1},
-	{"const.alt",0},
-	{"addr.pri",0},
-	{"addr.alt",0},
-	{"stor.pri",0},
-	{"stor.alt",0},
-	{"stor.s.pri",0},
-	{"stor.s.alt",0},
-	{"sref.pri",0},
-	{"sref.alt",0},
-	{"sref.s.pri",0},
-	{"sref.s.alt",0},
+	{"const.alt",1},
+	{"addr.pri",1},
+	{"addr.alt",1},
+	{"stor.pri",1},
+	{"stor.alt",1},
+	{"stor.s.pri",1},
+	{"stor.s.alt",1},
+	{"sref.pri",1},
+	{"sref.alt",1},
+	{"sref.s.pri",1},
+	{"sref.s.alt",1},
 	{"stor.i",0},
-	{"strb.i",0},
+	{"strb.i",1},
 	{"lidx",0},
-	{"lidx.b",0},
+	{"lidx.b",1},
 	{"idxaddr",0},
-	{"idxaddr.b",0},
-	{"align.pri",0},
-	{"align.alt",0},
-	{"lctrl",0},
-	{"sctrl",0},
+	{"idxaddr.b",1},
+	{"align.pri",1},
+	{"align.alt",1},
+	{"lctrl",1},
+	{"sctrl",1},
 	{"move.pri",0},
 	{"move.alt",0},
 	{"xchg",0},
 	{"push.pri",0},
 	{"push.alt",0},
-	{"push.r",0},
+	{"push.r",1},
 	{"push.c",1},
-	{"push",0},
-	{"push.s",0},
+	{"push",1},
+	{"push.s",1},
 	{"pop.pri",0},
 	{"pop.alt",0},
 	{"stack",1},
-	{"heap",0},
+	{"heap",1},
 	{"proc",0},
 	{"ret",0},
 	{"retn",0},
@@ -130,7 +148,7 @@ struct {
 	{"jump",0},
 	{"jrel",0},
 	{"jzer",0},
-	{"jnz",0},
+	{"jnz",1},
 	{"jeq",0},
 	{"jneq",0},
 	{"jless",0},

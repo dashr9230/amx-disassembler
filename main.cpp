@@ -201,14 +201,95 @@ void expand(unsigned char* code, long codesize, long memsize)
 	assert(memsize == 0);
 }
 
+char* getpublicname(AMX* amx, cell address)
+{
+	AMX_FUNCSTUB* func;
+	AMX_HEADER* hdr = (AMX_HEADER*)amx->base;
+	cell size = (cell)NUMENTRIES(hdr, publics, natives);
+
+	for (cell i = 0; i < size; i++)
+	{
+		func = GETENTRY(hdr, publics, i);
+		if (address == (cell)func->address)
+		{
+			return GETENTRYNAME(hdr, func);
+		}
+	}
+	return (char*)"";
+}
+
+char* getnativename(AMX* amx, cell index)
+{
+	AMX_HEADER* hdr = (AMX_HEADER*)amx->base;
+	AMX_FUNCSTUB* func;
+
+	cell size = (cell)NUMENTRIES(hdr, natives, libraries);
+	if (index >= size) return (char*)"";
+	func = GETENTRY(hdr, natives, index);
+	return GETENTRYNAME(hdr, func);
+}
+
+void disassemble(AMX* amx)
+{
+	AMX_HEADER* hdr = (AMX_HEADER*)amx->base;
+	ucell codesize = (ucell)(hdr->dat - hdr->cod);
+	unsigned char* code = amx->base + hdr->cod;
+	cell* cip = (cell*)(code + hdr->cip);
+
+	ucell code_address = (ucell)hdr->cod;
+
+	// check if the code has an entry point aka. main()
+	// surprisingly not counting on entry()
+	ucell start_address=0;
+	if(0 < hdr->cip)
+		start_address = hdr->cod + hdr->cip;
+
+	cell* ptr = (cell*)code;
+	for (ucell i = 0; i < codesize / sizeof(cell); i++)
+	{
+		// print the address starting from the code base
+		printf("%08X    ", code_address);
+
+		// print the OPCODE name
+		printf("%s ", OPCODES[ptr[i]].name);
+		
+		// mark position where the CIP (instruction pointer) starts 
+		if (code_address == start_address)
+			printf("; main()");
+		// if the OPCODE is PROC then print out the public name
+		else if (ptr[i] == 46) // PROC
+			printf("; %s", getpublicname(amx, code_address - hdr->cod));
+
+		// each instruction are 4 bytes, increment the address
+		// so we will know what and where that located
+		code_address += sizeof(cell);
+
+		// if the given parameter has a parameter
+		if (OPCODES[ptr[i]].flag == 1) {
+			// printing the corresponding value for the OPCODE
+			printf("%X", ptr[++i]);
+
+			// if OP_SYSREQ_C, include the calling native name for it
+			if (ptr[i - 1] == 123)
+				printf(" ; %s", getnativename(amx, ptr[i]));
+
+			// increment the address again, because counting on passed value
+			code_address += sizeof(cell);
+		}
+
+		// add new line to start the next instruction
+		printf("\n");
+	}
+}
+
 int main(int argc, char* argv[])
 {
-	if (argc < 2) {
+	/*if (argc < 2) {
 		printf("No arguments defined.\n");
 		return 0;
-	}
+	}*/
 
-	FILE* fp = fopen(argv[1], "rb");
+	FILE* fp = fopen("tests/new_entrymain.amx", "rb");
 	if (!fp) {
 		printf("File not found. Exiting...\n");
 		return 0;
@@ -232,13 +313,13 @@ int main(int argc, char* argv[])
 	fread(memblock, 1, (size_t)hdr.size, fp);
 	fclose(fp);
 
-	hexdump(memblock, hdr.size);
+	//hexdump(memblock, hdr.size);
 	//bytedump(memblock, hdr.size);
 	
 	AMX amx;
 	memset(&amx, 0, sizeof(AMX));
 
-	// be aware that while memblock is not equal to hdr since,
+	// be aware that memblock is not equal to hdr, because
 	// hdr only contains the first 56 bytes, while memblock
 	// contains all the bytes that the .amx file has
 	if ((hdr.flags & 0x04)!=0) // check if it has compact flag
@@ -252,33 +333,11 @@ int main(int argc, char* argv[])
 	amx.hea = amx.hlw;
 	amx.stk = amx.stp;
 
+	disassemble(&amx);
+
 	/*int publics_count = NUMENTRIES(&hdr, publics, natives);
 	printf("Publics count: %d\n", publics_count);*/
 
-	// Printing out the code/instruction block
-	ucell codesize = (ucell)(hdr.dat - hdr.cod);
-	unsigned char* code = amx.base + (int)hdr.cod;
-	/*for (ucell i = 0; i < codesize; i++)
-	{
-		printf("%02X ", code[i]);
-	}
-	printf("\n");*/
-
-	// Now trying to print the instructions
-	cell* ptr = (cell*)code;
-	for (ucell i = 0; i < codesize / sizeof(cell); i++)
-	{
-		printf("%s ", OPCODES[ptr[i]].name);
-		// if the given parameter needs a parameter to include
-		if (OPCODES[ptr[i]].flag == 1)
-		{
-			printf("%d", ptr[++i]);
-		}
-		printf("\n");
-	}
-
-	//cell* cip = (cell*)(code + (int)hdr.cip);
-
-	free(memblock); 0x0B;
+	free(memblock);
 	return 0;
 }
